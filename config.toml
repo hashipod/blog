@@ -1,5 +1,5 @@
 baseURL = "http://jieteki.com"
 languageCode = "en-us"
-title = "西凉驸马"
+title = "来自雁门关的带头大哥"
 theme = "hugo-notepadium"
 publishDir = "docs"
