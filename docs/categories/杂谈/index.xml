@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>杂谈 on 西凉驸马</title>
+    <link>/categories/%E6%9D%82%E8%B0%88/</link>
+    <description>Recent content in 杂谈 on 西凉驸马</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 17 Dec 2016 09:31:31 +0800</lastBuildDate>
+    
+        <atom:link href="/categories/%E6%9D%82%E8%B0%88/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>about</title>
+      <link>/posts/about/</link>
+      <pubDate>Sat, 17 Dec 2016 09:31:31 +0800</pubDate>
+      
+      <guid>/posts/about/</guid>
+      <description>a lazy man. really.</description>
+      
+    </item>
+    
+  </channel>
+</rss>

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en"><meta charset="utf-8"><meta name="generator" content="Hugo 0.71.1" /><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark"><title>Periodic task in cinder&nbsp;&ndash;&nbsp;西凉驸马</title><link rel="stylesheet" href="/css/core.min.3a0d78a824744d41c946bf81c086c63eb17b5b74edccaac7712bd1545f7db93853e39d163c0a358b305df41daa9d5f5e.css" integrity="sha384-Og14qCR0TUHJRr&#43;BwIbGPrF7W3TtzKrHcSvRVF99uThT450WPAo1izBd9B2qnV9e"><meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="Periodic task in cinder" /><body><section id="header">
+    <div class="header wrap"><span class="header left-side"><a class="site home" href="/"><span class="site name">西凉驸马</span></a></span>
+        <span class="header right-side"></span></div></section><section id="content"><div class="article-container"><section class="article header">
+    <h1 class="article title">Periodic task in cinder</h1><p class="article date">2017-01-15</p></section><article class="article markdown-body"><p>In openstack, there are a lot of periodically running jobs, like report state, report driver status, report capabilities etc.
+The component manager are often responsible for these kind of jobs. like <code>VolumeManager</code>.</p>
+<p>When we take a close look at these manager&rsquo;s code, we can see some methods are decorated by  <code>@periodic_task.periodic_task</code>,
+for example:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#f92672">from</span> oslo_service <span style="color:#f92672">import</span> periodic_task
+
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">VolumeManager</span>(manager<span style="color:#f92672">.</span>SchedulerDependentManager):
+    <span style="color:#f92672">...</span>
+    <span style="color:#a6e22e">@periodic_task.periodic_task</span>
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_report_driver_status</span>(self, context):
+        <span style="color:#f92672">...</span>
+</code></pre></div><p>From the decorator name <code>periodic_task</code>, we know these kinds of methods are meaned to be running periodicaly, so how are they implemented?</p>
+<p>file: oslo.service/oslo_service/periodic_task.py</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">periodic_task</span>(<span style="color:#f92672">*</span>args, <span style="color:#f92672">**</span>kwargs):
+    <span style="color:#e6db74">&#34;&#34;&#34;Decorator to indicate that a method is a periodic task.
+</span><span style="color:#e6db74">
+</span><span style="color:#e6db74">    This decorator can be used in two ways:
+</span><span style="color:#e6db74">
+</span><span style="color:#e6db74">        1. Without arguments &#39;@periodic_task&#39;, this will be run on the default
+</span><span style="color:#e6db74">           interval of 60 seconds.
+</span><span style="color:#e6db74">
+</span><span style="color:#e6db74">        2. With arguments:
+</span><span style="color:#e6db74">           @periodic_task(spacing=N [, run_immediately=[True|False]]
+</span><span style="color:#e6db74">           [, name=[None|&#34;string&#34;])
+</span><span style="color:#e6db74">           this will be run on approximately every N seconds. If this number is
+</span><span style="color:#e6db74">           negative the periodic task will be disabled. If the run_immediately
+</span><span style="color:#e6db74">           argument is provided and has a value of &#39;True&#39;, the first run of the
+</span><span style="color:#e6db74">           task will be shortly after task scheduler starts.  If
+</span><span style="color:#e6db74">           run_immediately is omitted or set to &#39;False&#39;, the first time the
+</span><span style="color:#e6db74">           task runs will be approximately N seconds after the task scheduler
+</span><span style="color:#e6db74">           starts. If name is not provided, __name__ of function is used.
+</span><span style="color:#e6db74">    &#34;&#34;&#34;</span>
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">decorator</span>(f):
+        <span style="color:#75715e"># Test for old style invocation</span>
+        <span style="color:#66d9ef">if</span> <span style="color:#e6db74">&#39;ticks_between_runs&#39;</span> <span style="color:#f92672">in</span> kwargs:
+            <span style="color:#66d9ef">raise</span> InvalidPeriodicTaskArg(arg<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;ticks_between_runs&#39;</span>)
+
+        <span style="color:#75715e"># Control if run at all</span>
+        f<span style="color:#f92672">.</span>_periodic_task <span style="color:#f92672">=</span> True
+        f<span style="color:#f92672">.</span>_periodic_external_ok <span style="color:#f92672">=</span> kwargs<span style="color:#f92672">.</span>pop(<span style="color:#e6db74">&#39;external_process_ok&#39;</span>, False)
+        f<span style="color:#f92672">.</span>_periodic_enabled <span style="color:#f92672">=</span> kwargs<span style="color:#f92672">.</span>pop(<span style="color:#e6db74">&#39;enabled&#39;</span>, True)
+        f<span style="color:#f92672">.</span>_periodic_name <span style="color:#f92672">=</span> kwargs<span style="color:#f92672">.</span>pop(<span style="color:#e6db74">&#39;name&#39;</span>, f<span style="color:#f92672">.</span>__name__)
+
+        <span style="color:#75715e"># Control frequency</span>
+        f<span style="color:#f92672">.</span>_periodic_spacing <span style="color:#f92672">=</span> kwargs<span style="color:#f92672">.</span>pop(<span style="color:#e6db74">&#39;spacing&#39;</span>, <span style="color:#ae81ff">0</span>)
+        f<span style="color:#f92672">.</span>_periodic_immediate <span style="color:#f92672">=</span> kwargs<span style="color:#f92672">.</span>pop(<span style="color:#e6db74">&#39;run_immediately&#39;</span>, False)
+        <span style="color:#66d9ef">if</span> f<span style="color:#f92672">.</span>_periodic_immediate:
+            f<span style="color:#f92672">.</span>_periodic_last_run <span style="color:#f92672">=</span> None
+        <span style="color:#66d9ef">else</span>:
+            f<span style="color:#f92672">.</span>_periodic_last_run <span style="color:#f92672">=</span> now()
+        <span style="color:#66d9ef">return</span> f
+
+    <span style="color:#66d9ef">if</span> kwargs:
+        <span style="color:#66d9ef">return</span> decorator
+    <span style="color:#66d9ef">else</span>:
+        <span style="color:#66d9ef">return</span> decorator(args[<span style="color:#ae81ff">0</span>])
+</code></pre></div><p>This decorator is a little different. Normally we use a decorator to do something before and after a method call, like below:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#f92672">import</span> functools
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">footprint</span>(f):
+    <span style="color:#e6db74">&#34;&#34;&#34;Decorator to log info before and after method call.
+</span><span style="color:#e6db74">    &#34;&#34;&#34;</span>
+    <span style="color:#a6e22e">@functools.wraps</span>(f)
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">decorator</span>(<span style="color:#f92672">*</span>args, <span style="color:#f92672">**</span>kwargs):
+        logger<span style="color:#f92672">.</span>info(<span style="color:#e6db74">&#39;before call&#39;</span>)
+        <span style="color:#66d9ef">return</span> f(<span style="color:#f92672">*</span>args, <span style="color:#f92672">**</span>kwargs)
+        logger<span style="color:#f92672">.</span>info(<span style="color:#e6db74">&#39;after call&#39;</span>)
+
+    <span style="color:#66d9ef">return</span> decorator
+</code></pre></div><p>but the <code>periodic_task</code> decorator is different: all it does is to attach some <code>_periodic_****</code> attribute to the function. SO who will consume these attributes?</p>
+<p>But first lets see VolumeManager inheritance tree.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#75715e"># file: oslo.service/oslo_service/periodic_task.py</span>
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">_PeriodicTasksMeta</span>(type):
+    <span style="color:#f92672">...</span>
+
+<span style="color:#a6e22e">@six.add_metaclass</span>(_PeriodicTasksMeta)
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">PeriodicTasks</span>(object):
+    <span style="color:#f92672">...</span>
+
+
+<span style="color:#75715e"># file: cinder/cinder/manager.py</span>
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">PeriodicTasks</span>(periodic_task<span style="color:#f92672">.</span>PeriodicTasks):
+    <span style="color:#f92672">...</span>
+
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Manager</span>(base<span style="color:#f92672">.</span>Base, PeriodicTasks):
+    <span style="color:#f92672">...</span>
+
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">SchedulerDependentManager</span>(Manager):
+    <span style="color:#f92672">...</span>
+
+
+<span style="color:#75715e"># file: cinder/cinder/volume/manager.py</span>
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">VolumeManager</span>(manager<span style="color:#f92672">.</span>SchedulerDependentManager):
+    <span style="color:#f92672">...</span>
+    <span style="color:#a6e22e">@periodic_task.periodic_task</span>
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_report_driver_status</span>(self, context):
+        <span style="color:#f92672">...</span>
+</code></pre></div><p>NOTE: <code>_PeriodicTasksMeta</code> and <code>PeriodicTasks</code> are in <code>periodic_task</code> module.</p>
+<p>The magic is coming from <code>_PeriodicTasksMeta</code>. It&rsquo;s a metaclass, metaclass can define the actual class <code>PeriodicTasks</code>'s behaviour.</p>
+<p>file: oslo.service/oslo_service/periodic_task.py</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">_PeriodicTasksMeta</span>(type):
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_add_periodic_task</span>(cls, task):
+        <span style="color:#e6db74">&#34;&#34;&#34;Add a periodic task to the list of periodic tasks.
+</span><span style="color:#e6db74">
+</span><span style="color:#e6db74">        The task should already be decorated by @periodic_task.
+</span><span style="color:#e6db74">
+</span><span style="color:#e6db74">        :return: whether task was actually enabled
+</span><span style="color:#e6db74">        &#34;&#34;&#34;</span>
+        name <span style="color:#f92672">=</span> task<span style="color:#f92672">.</span>_periodic_name
+        <span style="color:#f92672">...</span>
+        cls<span style="color:#f92672">.</span>_periodic_tasks<span style="color:#f92672">.</span>append((name, task))
+        cls<span style="color:#f92672">.</span>_periodic_spacing[name] <span style="color:#f92672">=</span> task<span style="color:#f92672">.</span>_periodic_spacing
+        <span style="color:#66d9ef">return</span> True
+
+    <span style="color:#66d9ef">def</span> __init__(cls, names, bases, dict_):
+        <span style="color:#e6db74">&#34;&#34;&#34;Metaclass that allows us to collect decorated periodic tasks.&#34;&#34;&#34;</span>
+        super(_PeriodicTasksMeta, cls)<span style="color:#f92672">.</span>__init__(names, bases, dict_)
+
+        <span style="color:#75715e"># NOTE(sirp): if the attribute is not present then we must be the base</span>
+        <span style="color:#75715e"># class, so, go ahead an initialize it. If the attribute is present,</span>
+        <span style="color:#75715e"># then we&#39;re a subclass so make a copy of it so we don&#39;t step on our</span>
+        <span style="color:#75715e"># parent&#39;s toes.</span>
+        <span style="color:#66d9ef">try</span>:
+            cls<span style="color:#f92672">.</span>_periodic_tasks <span style="color:#f92672">=</span> cls<span style="color:#f92672">.</span>_periodic_tasks[:]
+        <span style="color:#66d9ef">except</span> <span style="color:#a6e22e">AttributeError</span>:
+            cls<span style="color:#f92672">.</span>_periodic_tasks <span style="color:#f92672">=</span> []
+
+        <span style="color:#66d9ef">try</span>:
+            cls<span style="color:#f92672">.</span>_periodic_spacing <span style="color:#f92672">=</span> cls<span style="color:#f92672">.</span>_periodic_spacing<span style="color:#f92672">.</span>copy()
+        <span style="color:#66d9ef">except</span> <span style="color:#a6e22e">AttributeError</span>:
+            cls<span style="color:#f92672">.</span>_periodic_spacing <span style="color:#f92672">=</span> {}
+
+        <span style="color:#66d9ef">for</span> value <span style="color:#f92672">in</span> cls<span style="color:#f92672">.</span>__dict__<span style="color:#f92672">.</span>values():
+            <span style="color:#66d9ef">if</span> getattr(value, <span style="color:#e6db74">&#39;_periodic_task&#39;</span>, False):
+                cls<span style="color:#f92672">.</span>_add_periodic_task(value)
+
+</code></pre></div><p>The <code>__init__</code> method says:</p>
+<p>when your class (<code>VolumeManager</code>) is created, find out all its methods, collect those method who has attribute <code>_periodic_task</code> and add the method to <code>cls._periodic_tasks</code>.</p>
+<p>Then those decorated method are saved to <code>_periodic_tasks</code> array. So who will consume this array?</p>
+<p>Let’s take a look of Service <code>start</code>.</p>
+<p>file: cinder/cinder/service.py</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Service</span>(service<span style="color:#f92672">.</span>Service):
+    <span style="color:#f92672">...</span>
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">start</span>(self):
+        <span style="color:#f92672">...</span>
+        <span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>periodic_interval:
+            <span style="color:#f92672">...</span>
+            periodic <span style="color:#f92672">=</span> loopingcall<span style="color:#f92672">.</span>FixedIntervalLoopingCall(
+                self<span style="color:#f92672">.</span>periodic_tasks)
+            periodic<span style="color:#f92672">.</span>start(interval<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>periodic_interval,
+                           initial_delay<span style="color:#f92672">=</span>initial_delay)
+            self<span style="color:#f92672">.</span>timers<span style="color:#f92672">.</span>append(periodic)
+    <span style="color:#f92672">...</span>
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">periodic_tasks</span>(self, raise_on_error<span style="color:#f92672">=</span>False):
+        <span style="color:#f92672">...</span>
+        self<span style="color:#f92672">.</span>manager<span style="color:#f92672">.</span>periodic_tasks(ctxt, raise_on_error<span style="color:#f92672">=</span>raise_on_error)
+    <span style="color:#f92672">...</span>
+</code></pre></div><p>It’s a LoopingCall, every <code>interval</code> seconds, it will call <code>periodic_tasks</code>, which is actually call <code>manager.periodic_tasks</code></p>
+<p>file: cinder/cinder/manager.py</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Manager</span>(base<span style="color:#f92672">.</span>Base, PeriodicTasks):
+    <span style="color:#f92672">...</span>
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">periodic_tasks</span>(self, context, raise_on_error<span style="color:#f92672">=</span>False):
+        <span style="color:#e6db74">&#34;&#34;&#34;Tasks to be run at a periodic interval.&#34;&#34;&#34;</span>
+        <span style="color:#66d9ef">return</span> self<span style="color:#f92672">.</span>run_periodic_tasks(context, raise_on_error<span style="color:#f92672">=</span>raise_on_error)
+    <span style="color:#f92672">...</span>
+</code></pre></div><p>file: oslo.service/oslo_service/periodic_task.py</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#a6e22e">@six.add_metaclass</span>(_PeriodicTasksMeta)
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">PeriodicTasks</span>(object):
+    <span style="color:#f92672">...</span>
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">run_periodic_tasks</span>(self, context, raise_on_error<span style="color:#f92672">=</span>False):
+        <span style="color:#f92672">...</span>
+        <span style="color:#66d9ef">for</span> task_name, task <span style="color:#f92672">in</span> self<span style="color:#f92672">.</span>_periodic_tasks:
+            <span style="color:#f92672">...</span>
+            <span style="color:#66d9ef">try</span>:
+                task(self, context)
+            <span style="color:#66d9ef">except</span> <span style="color:#a6e22e">Exception</span>:
+                <span style="color:#66d9ef">if</span> raise_on_error:
+                    <span style="color:#66d9ef">raise</span>
+            time<span style="color:#f92672">.</span>sleep(<span style="color:#ae81ff">0</span>)
+    <span style="color:#f92672">...</span>
+</code></pre></div><p>Things are clear: Tasks are collected and saved in an array at Manager class when the class is created, a LoopingCall periodicaly fetch tasks from the array, running all these tasks every <code>interval</code> time.</p></article><section class="article labels"><a class="category" href=/categories/%E6%8A%80%E6%9C%AF%E6%96%87%E7%AB%A0/>技术文章</a><a class="category" href=/categories/%E4%BA%91%E8%AE%A1%E7%AE%97/>云计算</a></section></div>
+<div class="article bottom"><section class="article navigation"><p><a class="link" href="/posts/kolla/"><span class="li iconfont icon-article"></span>Use kolla to deploy openstack</a></p><p><a class="link" href="/posts/service_heat_beat/"><span class="li iconfont icon-article"></span>Service heat beat</a></p></section></div></section><section id="footer"><div class="footer-wrap">
+    <p class="copyright">西凉驸马</p>
+    <p class="powerby"><span>Powered by </span><a href="https://gohugo.io" 
+        target="_blank">Hugo</a><span> and the </span><a href="https://themes.gohugo.io/hugo-notepadium/" 
+        target="_blank">Notepadium</a></p>
+</div></section></body>
+
+</html>

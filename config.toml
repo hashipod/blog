@@ -1,0 +1,5 @@
+baseURL = "http://jieteki.com"
+languageCode = "en-us"
+title = "西凉驸马"
+theme = "hugo-notepadium"
+publishDir = "docs"

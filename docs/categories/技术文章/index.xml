@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>技术文章 on 西凉驸马</title>
+    <link>/categories/%E6%8A%80%E6%9C%AF%E6%96%87%E7%AB%A0/</link>
+    <description>Recent content in 技术文章 on 西凉驸马</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 13 Jul 2017 09:53:44 +0800</lastBuildDate>
+    
+        <atom:link href="/categories/%E6%8A%80%E6%9C%AF%E6%96%87%E7%AB%A0/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Use kolla to deploy openstack</title>
+      <link>/posts/kolla/</link>
+      <pubDate>Thu, 13 Jul 2017 09:53:44 +0800</pubDate>
+      
+      <guid>/posts/kolla/</guid>
+      <description>&lt;p&gt;It&amp;rsquo;s now common case when use ceph as the storage backend for openstack,
+cinder, glance, nova all these componets can share the same ceph cluster, make it extreamly fast for nova to boot an
+instance from glance.&lt;/p&gt;</description>
+      
+    </item>
+    
+    <item>
+      <title>Periodic task in cinder</title>
+      <link>/posts/periodic_task/</link>
+      <pubDate>Sun, 15 Jan 2017 15:06:42 +0800</pubDate>
+      
+      <guid>/posts/periodic_task/</guid>
+      <description>&lt;p&gt;In openstack, there are a lot of periodically running jobs, like report state, report driver status, report capabilities etc.
+The component manager are often responsible for these kind of jobs. like &lt;code&gt;VolumeManager&lt;/code&gt;.&lt;/p&gt;</description>
+      
+    </item>
+    
+    <item>
+      <title>Service heat beat</title>
+      <link>/posts/service_heat_beat/</link>
+      <pubDate>Sun, 15 Jan 2017 12:06:42 +0800</pubDate>
+      
+      <guid>/posts/service_heat_beat/</guid>
+      <description>&lt;p&gt;In a cluster with many services running, we need to know which service is currently up running, and which services are down. usually it is called &lt;code&gt;heart beat&lt;/code&gt; checking.&lt;/p&gt;</description>
+      
+    </item>
+    
+    <item>
+      <title>Load more and pull refresh</title>
+      <link>/posts/loadmore_recycler_view/</link>
+      <pubDate>Sat, 17 Dec 2016 13:18:53 +0800</pubDate>
+      
+      <guid>/posts/loadmore_recycler_view/</guid>
+      <description>&lt;p&gt;列表的下拉刷新是一个常见的场景， Android 提供了 SwipeRefreshLayout 这个布局来实现。列表到顶了再下拉，就会有个刷新的小圆圈表示在加载，这个圆圈是可以定制的。与此同时触发一个回调 OnRefresh 方法。当加载完成后，你需要手动将这个圆圈消除。
+把 ListView 套在这个 Layout 里面，这个 ListView 就具备下拉刷新的功能了。在更复杂的列表结构中，ListView 不能优雅胜任（或是性能不好？），此时 Android 提供了 RecyclerView 这个“item可回收”的列表容器来支持。RecyclerView 与对应的 RecyclerView.Adapter 组合可以做到 ListView 或者 GridView 的效果。&lt;/p&gt;</description>
+      
+    </item>
+    
+    <item>
+      <title>Sqlalchemy migration</title>
+      <link>/posts/sqlalchemy_migration/</link>
+      <pubDate>Sat, 17 Dec 2016 13:10:48 +0800</pubDate>
+      
+      <guid>/posts/sqlalchemy_migration/</guid>
+      <description>&lt;p&gt;Basic usage of sqlalchemy migration usage.&lt;/p&gt;</description>
+      
+    </item>
+    
+    <item>
+      <title>Explore ceph rbd</title>
+      <link>/posts/ceph_rbd/</link>
+      <pubDate>Sat, 17 Dec 2016 09:53:44 +0800</pubDate>
+      
+      <guid>/posts/ceph_rbd/</guid>
+      <description>&lt;p&gt;It&amp;rsquo;s now common case when use ceph as the storage backend for openstack,
+cinder, glance, nova all these componets can share the same ceph cluster, make it extreamly fast for nova to boot an
+instance from glance.&lt;/p&gt;</description>
+      
+    </item>
+    
+  </channel>
+</rss>

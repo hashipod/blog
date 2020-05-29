@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en"><meta charset="utf-8"><meta name="generator" content="Hugo 0.71.1" /><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark"><title>Explore ceph rbd&nbsp;&ndash;&nbsp;西凉驸马</title><link rel="stylesheet" href="/css/core.min.3a0d78a824744d41c946bf81c086c63eb17b5b74edccaac7712bd1545f7db93853e39d163c0a358b305df41daa9d5f5e.css" integrity="sha384-Og14qCR0TUHJRr&#43;BwIbGPrF7W3TtzKrHcSvRVF99uThT450WPAo1izBd9B2qnV9e"><meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="Explore ceph rbd" /><body><section id="header">
+    <div class="header wrap"><span class="header left-side"><a class="site home" href="/"><span class="site name">西凉驸马</span></a></span>
+        <span class="header right-side"></span></div></section><section id="content"><div class="article-container"><section class="article header">
+    <h1 class="article title">Explore ceph rbd</h1><p class="article date">2016-12-17</p></section><article class="article markdown-body"><p>It&rsquo;s now common case when use ceph as the storage backend for openstack,
+cinder, glance, nova all these componets can share the same ceph cluster, make it extreamly fast for nova to boot an
+instance from glance.</p>
+<p># source openrc admin admin</p>
+<h2 id="explore-images">EXPLORE IMAGES</h2>
+<p>list glance images, there are three by default</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">stack@starya:~/devstack$ glance image-list
++--------------------------------------+---------------------------------+
+| ID                                   | Name                            |
++--------------------------------------+---------------------------------+
+| 4e7659d7-c5d5-4036-ba41-b8d8415b6eeb | cirros-0.3.4-x86_64-uec         |
+| 1ac00d53-3475-4eb8-a4d2-83def42e469d | cirros-0.3.4-x86_64-uec-kernel  |
+| 52372aa2-f8af-4a0d-aea1-3f6da6ca67c9 | cirros-0.3.4-x86_64-uec-ramdisk |
+</code></pre></div><p>list rbd pools, the imajeez pool is used by glance. volumeuh pool is used by cinder, vmz pool is used by nova.</p>
+<p>NOTICE:</p>
+<p>everything in a image from the rbd view. so volumes are images in volumeuh, instance images are images in vmz, glance images are images in imajeez.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">stack@starya:~$ sudo ceph df
+GLOBAL:
+    SIZE       AVAIL      RAW USED     %RAW USED
+    10230M     10036M         193M          1.89
+POOLS:
+    NAME         ID     USED       %USED     MAX AVAIL     OBJECTS
+    data         <span style="color:#ae81ff">0</span>           <span style="color:#ae81ff">0</span>         <span style="color:#ae81ff">0</span>        10036M           <span style="color:#ae81ff">0</span>
+    metadata     <span style="color:#ae81ff">1</span>           <span style="color:#ae81ff">0</span>         <span style="color:#ae81ff">0</span>        10036M           <span style="color:#ae81ff">0</span>
+    rbd          <span style="color:#ae81ff">2</span>           <span style="color:#ae81ff">0</span>         <span style="color:#ae81ff">0</span>        10036M           <span style="color:#ae81ff">0</span>
+    backeups     <span style="color:#ae81ff">3</span>           <span style="color:#ae81ff">0</span>         <span style="color:#ae81ff">0</span>        10036M           <span style="color:#ae81ff">0</span>
+    imajeez      <span style="color:#ae81ff">4</span>      33091k      0.32        10036M          <span style="color:#ae81ff">12</span>
+    vmz          <span style="color:#ae81ff">5</span>           <span style="color:#ae81ff">0</span>         <span style="color:#ae81ff">0</span>        10036M           <span style="color:#ae81ff">0</span>
+    volumeuh     <span style="color:#ae81ff">6</span>          <span style="color:#ae81ff">32</span>         <span style="color:#ae81ff">0</span>        10036M           <span style="color:#ae81ff">5</span>
+</code></pre></div><p>list pool images in imajeez, three images. corespond to glance image list, the image name here is image id in glance view.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">stack@starya:~/devstack$ rbd ls imajeez
+1ac00d53-3475-4eb8-a4d2-83def42e469d
+4e7659d7-c5d5-4036-ba41-b8d8415b6eeb
+52372aa2-f8af-4a0d-aea1-3f6da6ca67c9
+</code></pre></div><p>show glance image detail. direct_url is a rbd:// protocol, ended with snap. which means the image in glance is a snapshot of image in rbd. the snapshot is created by default.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">stack@starya:~/devstack$ glance image-show 4e7659d7-c5d5-4036-ba41-b8d8415b6eeb
++------------------+----------------------------------------------------------------------------------+
+| Property         | Value                                                                            |
++------------------+----------------------------------------------------------------------------------+
+| checksum         | eb9139e4942121f22bbc2afc0400b2a4                                                 |
+| container_format | ami                                                                              |
+| created_at       | 2016-08-27T10:14:41Z                                                             |
+| direct_url       | rbd://58bd8c9c-d62d-4747-9d5c-                                                   |
+|                  | ebdc02c9b7d8/imajeez/4e7659d7-c5d5-4036-ba41-b8d8415b6eeb/snap                   |
+| disk_format      | ami                                                                              |
+| id               | 4e7659d7-c5d5-4036-ba41-b8d8415b6eeb                                             |
+| kernel_id        | 1ac00d53-3475-4eb8-a4d2-83def42e469d                                             |
+| min_disk         | <span style="color:#ae81ff">0</span>                                                                                |
+| min_ram          | <span style="color:#ae81ff">0</span>                                                                                |
+| name             | cirros-0.3.4-x86_64-uec                                                          |
+| owner            | 270f4f7cc4184db4a2cb48357d414629                                                 |
+| protected        | False                                                                            |
+| ramdisk_id       | 52372aa2-f8af-4a0d-aea1-3f6da6ca67c9                                             |
+| size             | <span style="color:#ae81ff">25165824</span>                                                                         |
+| status           | active                                                                           |
+| tags             | <span style="color:#f92672">[]</span>                                                                               |
+| updated_at       | 2016-08-27T10:14:41Z                                                             |
+| virtual_size     | None                                                                             |
+| visibility       | public                                                                           |
++------------------+----------------------------------------------------------------------------------+
+</code></pre></div><p>get info of the rbd image, and it’s snaps</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">stack@starya:~/devstack$ rbd info imajeez/4e7659d7-c5d5-4036-ba41-b8d8415b6eeb
+rbd image <span style="color:#e6db74">&#39;4e7659d7-c5d5-4036-ba41-b8d8415b6eeb&#39;</span>:
+	size <span style="color:#ae81ff">24576</span> kB in <span style="color:#ae81ff">3</span> objects
+	order <span style="color:#ae81ff">23</span> <span style="color:#f92672">(</span><span style="color:#ae81ff">8192</span> kB objects<span style="color:#f92672">)</span>
+	block_name_prefix: rbd_data.372283fd80f
+	format: <span style="color:#ae81ff">2</span>
+	features: layering, striping
+	stripe unit: <span style="color:#ae81ff">4096</span> kB
+	stripe count: <span style="color:#ae81ff">1</span>
+stack@starya:~/devstack$ rbd snap ls imajeez/4e7659d7-c5d5-4036-ba41-b8d8415b6eeb
+SNAPID NAME     SIZE
+     <span style="color:#ae81ff">4</span> snap <span style="color:#ae81ff">24576</span> kB
+</code></pre></div><p>could NOT delete imajeez image, because it has snapshot</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">stack@starya:~/devstack$ rbd rm imajeez/4e7659d7-c5d5-4036-ba41-b8d8415b6eeb
+2016-08-28 17:23:34.139435 7f11e5f6f7c0 -1 librbd: image has snapshots - not removing
+Removing image: 0% complete...failed.
+rbd: image has snapshots - these must be deleted with <span style="color:#e6db74">&#39;rbd snap purge&#39;</span> before the image can be removed.
+</code></pre></div><h2 id="explore-volumes-and-snapshots">EXPLORE VOLUMES AND SNAPSHOTS</h2>
+<p>create three volumes, and there snapshots</p>
+<p><img  src="http://image.bitbut.com/257BC4C435262D0D789E3430378BD3B7.jpg"
+        alt/></p>
+<p><img  src="http://image.bitbut.com/039F06063E6A339E2CF743D3D25C2907.jpg"
+        alt/></p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">vol-a <span style="color:#f92672">====</span>&gt; snap-a
+vol-a <span style="color:#f92672">====</span>&gt; snap-b
+vol-m <span style="color:#f92672">====</span>&gt; snap-m
+cirros-0.3.4-x86_64-uec <span style="color:#f92672">=====</span>&gt; vol-cirros
+</code></pre></div><p>list in cinder</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">stack@starya:~/devstack$ cinder list
++--------------------------------------+-----------+------------+------+-------------+----------+-------------+
+|                  ID                  |   Status  |    Name    | Size | Volume Type | Bootable | Attached to |
++--------------------------------------+-----------+------------+------+-------------+----------+-------------+
+| 48eef4de-e725-489c-ae06-725e0cfc78c6 | available | vol-cirros |  <span style="color:#ae81ff">2</span>   |     ceph    |   true   |             |
+| 554830b3-81fb-4423-b186-c41974e0b899 | available |   vol-m    |  <span style="color:#ae81ff">1</span>   |     ceph    |  false   |             |
+| a60139fa-835c-4f83-80f7-7a32e9507f44 | available |   vol-a    |  <span style="color:#ae81ff">3</span>   |     ceph    |  false   |             |
++--------------------------------------+-----------+------------+------+-------------+----------+-------------+
+</code></pre></div><p>list in rbd, notice the volume ID and rbd NAME are relevant</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">stack@starya:~/devstack$ rbd ls volumeuh
+volume-48eef4de-e725-489c-ae06-725e0cfc78c6
+volume-554830b3-81fb-4423-b186-c41974e0b899
+volume-a60139fa-835c-4f83-80f7-7a32e9507f44
+</code></pre></div><p>let’s see the vol-a has two snapshots in rdb</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">stack@starya:~/devstack$ rbd info volumeuh/volume-a60139fa-835c-4f83-80f7-7a32e9507f44
+rbd image <span style="color:#e6db74">&#39;volume-a60139fa-835c-4f83-80f7-7a32e9507f44&#39;</span>:
+	size <span style="color:#ae81ff">3072</span> MB in <span style="color:#ae81ff">768</span> objects
+	order <span style="color:#ae81ff">22</span> <span style="color:#f92672">(</span><span style="color:#ae81ff">4096</span> kB objects<span style="color:#f92672">)</span>
+	block_name_prefix: rbd_data.37a475b31fd5
+	format: <span style="color:#ae81ff">2</span>
+	features: layering, striping
+	stripe unit: <span style="color:#ae81ff">4096</span> kB
+	stripe count: <span style="color:#ae81ff">1</span>
+stack@starya:~/devstack$ rbd snap ls volumeuh/volume-a60139fa-835c-4f83-80f7-7a32e9507f44
+SNAPID NAME                                             SIZE
+     <span style="color:#ae81ff">2</span> snapshot-7712c4ac-b325-446b-bb27-65c58235e175 <span style="color:#ae81ff">1024</span> MB
+     <span style="color:#ae81ff">3</span> snapshot-de943b3b-6039-4776-b560-0e36b76eda86 <span style="color:#ae81ff">1024</span> MB
+</code></pre></div><p>can not delete a snapshot from rbd</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">stack@starya:~/devstack$ rbd snap rm volumeuh/volume-a60139fa-835c-4f83-80f7-7a32e9507f44@snapshot-de943b3b-6039-4776-b560-0e36b76eda86
+rbd: snapshot <span style="color:#e6db74">&#39;snapshot-de943b3b-6039-4776-b560-0e36b76eda86&#39;</span> is protected from removal.
+2016-08-28 18:17:50.566728 7f86038957c0 -1 librbd: removing snapshot from header failed: <span style="color:#f92672">(</span>16<span style="color:#f92672">)</span> Device or resource busy
+</code></pre></div><p>but can delete from horizon. after delete, ls snapshot again.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">stack@starya:~/devstack$ rbd snap ls volumeuh/volume-a60139fa-835c-4f83-80f7-7a32e9507f44
+SNAPID NAME                                             SIZE
+     <span style="color:#ae81ff">2</span> snapshot-7712c4ac-b325-446b-bb27-65c58235e175 <span style="color:#ae81ff">1024</span> MB
+</code></pre></div><p>create another volume from the snapshot, then the volume become the snapshot’s children</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">stack@starya:~/devstack$ rbd children volumeuh/volume-a60139fa-835c-4f83-80f7-7a32e9507f44@snapshot-7712c4ac-b325-446b-bb27-65c58235e175
+volumeuh/volume-72690574-9cac-45c5-9a84-d040af987ed0
+</code></pre></div><p><img  src="http://image.bitbut.com/044B59EA2734D6372F749EF90125A5A1.png"
+        alt/></p>
+<p>Note</p>
+<p>The terms “parent” and “child” mean a Ceph block device snapshot (parent), and the corresponding image cloned from the snapshot (child). These terms are important for the command line usage below.</p>
+<h2 id="getting-start-with-layering">GETTING START WITH LAYERING</h2>
+<p>Ceph block device layering is a simple process. You must have an image. You must create a snapshot of the image. You must protect the snapshot. Once you have performed these steps, you can begin cloning the snapshot.</p>
+<p><img  src="http://image.bitbut.com/3BB62904DD4E6216F7D0F432FBE85026.png"
+        alt/></p>
+<p>let’s see the info of the volume just created from snapshot</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">stack@starya:~/devstack$ rbd info volumeuh/volume-72690574-9cac-45c5-9a84-d040af987ed0
+rbd image <span style="color:#960050;background-color:#1e0010">&#39;</span>volume-72690574-9cac-45c5-9a84-d040af987ed0’:
+	size <span style="color:#ae81ff">1024</span> MB in <span style="color:#ae81ff">256</span> objects
+	order <span style="color:#ae81ff">22</span> <span style="color:#f92672">(</span><span style="color:#ae81ff">4096</span> kB objects<span style="color:#f92672">)</span>
+	block_name_prefix: rbd_data.42cf22a520f
+	format: <span style="color:#ae81ff">2</span>
+	features: layering, striping
+	parent: volumeuh/volume-a60139fa-835c-4f83-80f7-7a32e9507f44@snapshot-7712c4ac-b325-446b-bb27-65c58235e175
+	overlap: <span style="color:#ae81ff">1024</span> MB
+	stripe unit: <span style="color:#ae81ff">4096</span> kB
+ 	stripe count: <span style="color:#ae81ff">1</span>
+</code></pre></div><p>delete the snapshot from horizon, shows ERROR snapshot is busy. because it has children.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">2016-08-28 18:48:33.507 ERROR cinder.volume.manager <span style="color:#f92672">[</span>req-3b0a5b92-bdc6-477f-96bc-06e2e866b000 d31901d9095549419b6bc06b0c48d39e 270f4f7cc4184db4a2cb48357d41462
+9<span style="color:#f92672">]</span> Delete snapshot failed, due to snapshot busy.
+</code></pre></div><p>flatten the volume, then get info again, the volume is concret volume, and has no relation to the snapshot anymore.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">stack@starya:~/devstack$ rbd flatten volumeuh/volume-72690574-9cac-45c5-9a84-d040af987ed0
+Image flatten: 100% complete…done.
+stack@starya:~/devstack$ rbd info volumeuh/volume-72690574-9cac-45c5-9a84-d040af987ed0
+rbd image <span style="color:#e6db74">&#39;volume-72690574-9cac-45c5-9a84-d040af987ed0&#39;</span>:
+	size <span style="color:#ae81ff">1024</span> MB in <span style="color:#ae81ff">256</span> objects
+	order <span style="color:#ae81ff">22</span> <span style="color:#f92672">(</span><span style="color:#ae81ff">4096</span> kB objects<span style="color:#f92672">)</span>
+	block_name_prefix: rbd_data.42bf36ce8449
+	format: <span style="color:#ae81ff">2</span>
+	features: layering, striping
+	stripe unit: <span style="color:#ae81ff">4096</span> kB
+ 	stripe count: <span style="color:#ae81ff">1</span>
+</code></pre></div><p>delete the snapshot from horizon, snapshot deleted successfuly.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh">2016-08-28 18:50:10.239 INFO cinder.volume.manager <span style="color:#f92672">[</span>req-4079a7f6-ae1e-40a3-8205-f6b47a889b66 d31901d9095549419b6bc06b0c48d39e 270f4f7cc4184db4a2cb48357d414629<span style="color:#f92672">]</span> Delete snapshot completed successfully
+</code></pre></div><h2 id="rollback">ROLLBACK</h2>
+<p>rollback snapshot1 means overriting volume1 with snapshot1, but clone snapshot1 to volume2 is faster and prefered.</p>
+<pre><code>rbd --pool rbd snap rollback --snap snapname foo
+    rbd snap rollback rbd/foo@snapname
+</code></pre><p>NOTICE:
+Rolling back an image to a snapshot means overwriting the current version of the image with data from a snapshot. The time it takes to execute a rollback increases with the size of the image. It is <strong>faster to clone</strong> from a snapshot <strong>than to rollback</strong> an image to a snapshot, and it is the preferred method of returning to a pre-existing state.</p>
+<p>links:</p>
+<p><a href="http://docs.ceph.com/docs/hammer/rbd/rbd-snapshot/">http://docs.ceph.com/docs/hammer/rbd/rbd-snapshot/</a><!-- raw HTML omitted -->
+<a href="http://www.cnblogs.com/sammyliu/p/4838138.html">http://www.cnblogs.com/sammyliu/p/4838138.html</a></p></article><section class="article labels"><a class="category" href=/categories/%E6%8A%80%E6%9C%AF%E6%96%87%E7%AB%A0/>技术文章</a><a class="category" href=/categories/%E4%BA%91%E8%AE%A1%E7%AE%97/>云计算</a></section></div>
+<div class="article bottom"><section class="article navigation"><p><a class="link" href="/posts/sqlalchemy_migration/"><span class="li iconfont icon-article"></span>Sqlalchemy migration</a></p><p><a class="link" href="/posts/about/"><span class="li iconfont icon-article"></span>about</a></p></section></div></section><section id="footer"><div class="footer-wrap">
+    <p class="copyright">西凉驸马</p>
+    <p class="powerby"><span>Powered by </span><a href="https://gohugo.io" 
+        target="_blank">Hugo</a><span> and the </span><a href="https://themes.gohugo.io/hugo-notepadium/" 
+        target="_blank">Notepadium</a></p>
+</div></section></body>
+
+</html>
